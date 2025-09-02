@@ -1,0 +1,13 @@
+{
+  "path": "/Users/aps/Documents/GitHub/colorDataToJson/Data",
+  "json_file": "printer.cie.json",
+  "measurement_id": "",
+  "db_uri": "",
+  "schema": "color_data",
+  "log_level": "INFO",
+  "log_file": "Logs/test.log",
+  "debug": false,
+  "verbose": false,
+  "dry_run": false,
+  "no_db_check": false
+}
