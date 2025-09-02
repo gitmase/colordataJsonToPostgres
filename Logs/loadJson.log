@@ -1,0 +1,81 @@
+2025-09-01 16:03:56 [INFO] root - Using DB URI: postgresql+psycopg2://pgadmin:****@10.211.55.9:5432/postgres
+2025-09-01 16:03:56 [INFO] root - Using measurement_id: 35f44f56-9453-4777-a1d2-de843d0fa9f4
+2025-09-01 16:03:56 [INFO] root - Schema: color_measurement
+2025-09-01 16:03:56 [INFO] root - Processing file: /Users/aps/Documents/GitHub/jsonToPostgres/Data/printer.cie.json
+2025-09-01 16:03:56 [INFO] root - Effective measurement_id (JSON preferred): 35f44f56-9453-4777-a1d2-de843d0fa9f4
+2025-09-01 16:03:56 [INFO] root - Schema 'color_measurement' exists.
+2025-09-01 16:03:56 [INFO] root - Schema up-to-date: ensured project, template, parsed_date columns.
+2025-09-01 16:03:56 [INFO] root - Indexes ensured on measurement_data table.
+2025-09-01 16:03:56 [INFO] root - Using measurement_id: 71c725f5-30c4-4dc0-bb3f-49ea9568d0e0
+2025-09-01 16:03:56 [INFO] root - DescriptiveData entry committed successfully.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 1 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 2 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 3 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 4 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 5 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 6 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 7 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 8 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 9 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 10 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 11 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 12 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 13 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 14 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 15 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 16 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 17 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 18 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 19 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 20 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 21 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 22 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 23 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 24 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 25 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 26 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 27 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 28 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 29 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 30 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 31 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 32 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 33 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 34 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 35 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 36 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 37 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 38 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 39 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 40 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 41 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 42 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 43 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 44 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 45 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 46 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 47 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 48 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 49 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 50 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 51 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 52 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 53 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 54 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 55 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 56 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 57 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 58 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 59 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 60 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 61 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 62 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 63 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 64 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 65 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 66 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 67 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 68 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 69 committed.
+2025-09-01 16:03:56 [INFO] root - Measurement entry for sample_id 70 committed.
+2025-09-01 16:03:56 [INFO] root - ✅ All measurement records inserted successfully.

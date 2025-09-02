@@ -1,0 +1,286 @@
+2025-09-01 17:20:40 [INFO] root - Using DB URI: postgresql+psycopg2://pgadmin:****@10.211.55.9:5432/postgres
+2025-09-01 17:20:40 [INFO] root - Using measurement_id: daf89a04-7baa-4e73-a5be-13ec3d965c0f
+2025-09-01 17:20:40 [INFO] root - Schema: color_data
+2025-09-01 17:20:40 [INFO] root - Processing file: /Users/aps/Documents/GitHub/colorDataToJson/Data/printer.cie.json
+2025-09-01 17:20:40 [INFO] root - Effective measurement_id (JSON preferred): daf89a04-7baa-4e73-a5be-13ec3d965c0f
+2025-09-01 17:20:40 [INFO] root - Schema 'color_data' exists.
+2025-09-01 17:20:40 [INFO] root - Schema up-to-date: ensured project, template, parsed_date columns.
+2025-09-01 17:20:40 [INFO] root - Indexes ensured on measurement_data table.
+2025-09-01 17:20:40 [INFO] root - Using measurement_id: 71c725f5-30c4-4dc0-bb3f-49ea9568d0e0
+2025-09-01 17:20:40 [ERROR] root - Error inserting DescriptiveData: (psycopg2.errors.NotNullViolation) null value in column "version" of relation "descriptive_data" violates not-null constraint
+DETAIL:  Failing row contains (71c725f5-30c4-4dc0-bb3f-49ea9568d0e0, null, Raphael, 2025-09-01, 2025-09-01 17:20:40.838566-04, 2025-09-01 17:20:40.838566-04, null, Barbieri Gateway WIN 4.6.42, Speclib Version: 5.29, Platform: Spectro LFP  ver:7.13 RT S2 S3 Sqb  itx1| GMN=18F00304..., null, null, D50, 2, null, null, 52, 70, 14, SAMPLE_ID	CMYK_C	CMYK_M	CMYK_Y	CMYK_K	XYZ_X	XYZ_Y	XYZ_Z	LAB_L	LA..., null, null, t, f, t, t, t, Test Decription 3, null, 2025-09-01 17:20:40.838566-04, 2025-09-01 17:20:40.838566-04, null, Project 3, Template S1, null).
+
+[SQL: INSERT INTO color_data.descriptive_data (measurement_id, project, template, measurement, print_date, creation_date, target_id, originator, device_model, device_serial_number, sample_backing, measurement_illumination, measurement_angle, measurement_condition, measurement_filter, number_of_fields, number_of_sets, row_length, data_format, sample_id, sample_name, cmyk, rgb, xyz, lab, spectral, description, status, firstdate, lastdate, version) VALUES (%(measurement_id)s::UUID, %(project)s, %(template)s, %(measurement)s, now(), now(), %(target_id)s, %(originator)s, %(device_model)s, %(device_serial_number)s, %(sample_backing)s, %(measurement_illumination)s, %(measurement_angle)s, %(measurement_condition)s, %(measurement_filter)s, %(number_of_fields)s, %(number_of_sets)s, %(row_length)s, %(data_format)s, %(sample_id)s, %(sample_name)s, %(cmyk)s, %(rgb)s, %(xyz)s, %(lab)s, %(spectral)s, %(description)s, %(status)s, now(), now(), %(version)s) RETURNING color_data.descriptive_data.print_date, color_data.descriptive_data.creation_date, color_data.descriptive_data.firstdate, color_data.descriptive_data.lastdate]
+[parameters: {'measurement_id': '71c725f5-30c4-4dc0-bb3f-49ea9568d0e0', 'project': 'Project 3', 'template': 'Template S1', 'measurement': 'Raphael', 'target_id': None, 'originator': 'Barbieri Gateway WIN 4.6.42, Speclib Version: 5.29', 'device_model': 'Platform: Spectro LFP  ver:7.13 RT S2 S3 Sqb  itx1| GMN=18F00304 | GSN=B9070665Spectral Unit: Spectro qb spectral unit  ver: 7.11 RT | GMN=18F00304 | GSN=B9070665 Transmission Unit: BAEL 99-2A  ver: 6.01 T | GMN=67111111Spectro LFPqb sensing unit 1 ver:1.30OK, DOC', 'device_serial_number': None, 'sample_backing': None, 'measurement_illumination': 'D50', 'measurement_angle': '2', 'measurement_condition': None, 'measurement_filter': None, 'number_of_fields': 52, 'number_of_sets': 70, 'row_length': 14, 'data_format': 'SAMPLE_ID\tCMYK_C\tCMYK_M\tCMYK_Y\tCMYK_K\tXYZ_X\tXYZ_Y\tXYZ_Z\tLAB_L\tLAB_A\tLAB_B\tSPECTRAL_380\tSPECTRAL_390\tSPECTRAL_400\tSPECTRAL_410\tSPECTRAL ... (359 characters truncated) ... CTRAL_680\tSPECTRAL_690\tSPECTRAL_700\tSPECTRAL_710\tSPECTRAL_720\tSPECTRAL_730\tSPECTRAL_740\tSPECTRAL_750\tSPECTRAL_760\tSPECTRAL_770\tSPECTRAL_780', 'sample_id': None, 'sample_name': None, 'cmyk': True, 'rgb': False, 'xyz': True, 'lab': True, 'spectral': True, 'description': 'Test Decription 3', 'status': None, 'version': None}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+2025-09-01 17:20:40 [ERROR] root - DescriptiveData insert failed
+Traceback (most recent call last):
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.errors.NotNullViolation: null value in column "version" of relation "descriptive_data" violates not-null constraint
+DETAIL:  Failing row contains (71c725f5-30c4-4dc0-bb3f-49ea9568d0e0, null, Raphael, 2025-09-01, 2025-09-01 17:20:40.838566-04, 2025-09-01 17:20:40.838566-04, null, Barbieri Gateway WIN 4.6.42, Speclib Version: 5.29, Platform: Spectro LFP  ver:7.13 RT S2 S3 Sqb  itx1| GMN=18F00304..., null, null, D50, 2, null, null, 52, 70, 14, SAMPLE_ID	CMYK_C	CMYK_M	CMYK_Y	CMYK_K	XYZ_X	XYZ_Y	XYZ_Z	LAB_L	LA..., null, null, t, f, t, t, t, Test Decription 3, null, 2025-09-01 17:20:40.838566-04, 2025-09-01 17:20:40.838566-04, null, Project 3, Template S1, null).
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/loadJson.py", line 632, in process_file
+    session.commit()
+    ~~~~~~~~~~~~~~^^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 2032, in commit
+    trans.commit(_to_root=True)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "<string>", line 2, in commit
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 1313, in commit
+    self._prepare_impl()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "<string>", line 2, in _prepare_impl
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 1288, in _prepare_impl
+    self.session.flush()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 4345, in flush
+    self._flush(objects)
+    ~~~~~~~~~~~^^^^^^^^^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 4480, in _flush
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 4441, in _flush
+    flush_context.execute()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/unitofwork.py", line 466, in execute
+    rec.execute(self)
+    ~~~~~~~~~~~^^^^^^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.mapper,
+        ^^^^^^^^^^^^
+        uow.states_for_mapper_hierarchy(self.mapper, False, False),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        uow,
+        ^^^^
+    )
+    ^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        base_mapper,
+        ^^^^^^^^^^^^
+    ...<3 lines>...
+        insert,
+        ^^^^^^^
+    )
+    ^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/persistence.py", line 1233, in _emit_insert_statements
+    result = connection.execute(
+        statement,
+        params,
+        execution_options=execution_options,
+    )
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or NO_OPTIONS,
+    )
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/sql/elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, distilled_params, execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+        dialect,
+    ...<8 lines>...
+        cache_hit=cache_hit,
+    )
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, statement, parameters
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e, str_statement, effective_parameters, cursor, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.IntegrityError: (psycopg2.errors.NotNullViolation) null value in column "version" of relation "descriptive_data" violates not-null constraint
+DETAIL:  Failing row contains (71c725f5-30c4-4dc0-bb3f-49ea9568d0e0, null, Raphael, 2025-09-01, 2025-09-01 17:20:40.838566-04, 2025-09-01 17:20:40.838566-04, null, Barbieri Gateway WIN 4.6.42, Speclib Version: 5.29, Platform: Spectro LFP  ver:7.13 RT S2 S3 Sqb  itx1| GMN=18F00304..., null, null, D50, 2, null, null, 52, 70, 14, SAMPLE_ID	CMYK_C	CMYK_M	CMYK_Y	CMYK_K	XYZ_X	XYZ_Y	XYZ_Z	LAB_L	LA..., null, null, t, f, t, t, t, Test Decription 3, null, 2025-09-01 17:20:40.838566-04, 2025-09-01 17:20:40.838566-04, null, Project 3, Template S1, null).
+
+[SQL: INSERT INTO color_data.descriptive_data (measurement_id, project, template, measurement, print_date, creation_date, target_id, originator, device_model, device_serial_number, sample_backing, measurement_illumination, measurement_angle, measurement_condition, measurement_filter, number_of_fields, number_of_sets, row_length, data_format, sample_id, sample_name, cmyk, rgb, xyz, lab, spectral, description, status, firstdate, lastdate, version) VALUES (%(measurement_id)s::UUID, %(project)s, %(template)s, %(measurement)s, now(), now(), %(target_id)s, %(originator)s, %(device_model)s, %(device_serial_number)s, %(sample_backing)s, %(measurement_illumination)s, %(measurement_angle)s, %(measurement_condition)s, %(measurement_filter)s, %(number_of_fields)s, %(number_of_sets)s, %(row_length)s, %(data_format)s, %(sample_id)s, %(sample_name)s, %(cmyk)s, %(rgb)s, %(xyz)s, %(lab)s, %(spectral)s, %(description)s, %(status)s, now(), now(), %(version)s) RETURNING color_data.descriptive_data.print_date, color_data.descriptive_data.creation_date, color_data.descriptive_data.firstdate, color_data.descriptive_data.lastdate]
+[parameters: {'measurement_id': '71c725f5-30c4-4dc0-bb3f-49ea9568d0e0', 'project': 'Project 3', 'template': 'Template S1', 'measurement': 'Raphael', 'target_id': None, 'originator': 'Barbieri Gateway WIN 4.6.42, Speclib Version: 5.29', 'device_model': 'Platform: Spectro LFP  ver:7.13 RT S2 S3 Sqb  itx1| GMN=18F00304 | GSN=B9070665Spectral Unit: Spectro qb spectral unit  ver: 7.11 RT | GMN=18F00304 | GSN=B9070665 Transmission Unit: BAEL 99-2A  ver: 6.01 T | GMN=67111111Spectro LFPqb sensing unit 1 ver:1.30OK, DOC', 'device_serial_number': None, 'sample_backing': None, 'measurement_illumination': 'D50', 'measurement_angle': '2', 'measurement_condition': None, 'measurement_filter': None, 'number_of_fields': 52, 'number_of_sets': 70, 'row_length': 14, 'data_format': 'SAMPLE_ID\tCMYK_C\tCMYK_M\tCMYK_Y\tCMYK_K\tXYZ_X\tXYZ_Y\tXYZ_Z\tLAB_L\tLAB_A\tLAB_B\tSPECTRAL_380\tSPECTRAL_390\tSPECTRAL_400\tSPECTRAL_410\tSPECTRAL ... (359 characters truncated) ... CTRAL_680\tSPECTRAL_690\tSPECTRAL_700\tSPECTRAL_710\tSPECTRAL_720\tSPECTRAL_730\tSPECTRAL_740\tSPECTRAL_750\tSPECTRAL_760\tSPECTRAL_770\tSPECTRAL_780', 'sample_id': None, 'sample_name': None, 'cmyk': True, 'rgb': False, 'xyz': True, 'lab': True, 'spectral': True, 'description': 'Test Decription 3', 'status': None, 'version': None}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+2025-09-01 17:20:40 [CRITICAL] root - Uncaught exception
+Traceback (most recent call last):
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.errors.NotNullViolation: null value in column "version" of relation "descriptive_data" violates not-null constraint
+DETAIL:  Failing row contains (71c725f5-30c4-4dc0-bb3f-49ea9568d0e0, null, Raphael, 2025-09-01, 2025-09-01 17:20:40.838566-04, 2025-09-01 17:20:40.838566-04, null, Barbieri Gateway WIN 4.6.42, Speclib Version: 5.29, Platform: Spectro LFP  ver:7.13 RT S2 S3 Sqb  itx1| GMN=18F00304..., null, null, D50, 2, null, null, 52, 70, 14, SAMPLE_ID	CMYK_C	CMYK_M	CMYK_Y	CMYK_K	XYZ_X	XYZ_Y	XYZ_Z	LAB_L	LA..., null, null, t, f, t, t, t, Test Decription 3, null, 2025-09-01 17:20:40.838566-04, 2025-09-01 17:20:40.838566-04, null, Project 3, Template S1, null).
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/loadJson.py", line 754, in <module>
+    main()
+    ~~~~^^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/loadJson.py", line 741, in main
+    process_file(
+    ~~~~~~~~~~~~^
+        json_file=json_file,
+        ^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        schema=schema,
+        ^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/loadJson.py", line 632, in process_file
+    session.commit()
+    ~~~~~~~~~~~~~~^^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 2032, in commit
+    trans.commit(_to_root=True)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "<string>", line 2, in commit
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 1313, in commit
+    self._prepare_impl()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "<string>", line 2, in _prepare_impl
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 1288, in _prepare_impl
+    self.session.flush()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 4345, in flush
+    self._flush(objects)
+    ~~~~~~~~~~~^^^^^^^^^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 4480, in _flush
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/util/langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/session.py", line 4441, in _flush
+    flush_context.execute()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/unitofwork.py", line 466, in execute
+    rec.execute(self)
+    ~~~~~~~~~~~^^^^^^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/unitofwork.py", line 642, in execute
+    util.preloaded.orm_persistence.save_obj(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.mapper,
+        ^^^^^^^^^^^^
+        uow.states_for_mapper_hierarchy(self.mapper, False, False),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        uow,
+        ^^^^
+    )
+    ^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/persistence.py", line 93, in save_obj
+    _emit_insert_statements(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        base_mapper,
+        ^^^^^^^^^^^^
+    ...<3 lines>...
+        insert,
+        ^^^^^^^
+    )
+    ^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/orm/persistence.py", line 1233, in _emit_insert_statements
+    result = connection.execute(
+        statement,
+        params,
+        execution_options=execution_options,
+    )
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or NO_OPTIONS,
+    )
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/sql/elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, distilled_params, execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+        dialect,
+    ...<8 lines>...
+        cache_hit=cache_hit,
+    )
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, statement, parameters
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e, str_statement, effective_parameters, cursor, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/aps/Documents/GitHub/jsonToPostgres/.venv/lib/python3.13/site-packages/sqlalchemy/engine/default.py", line 951, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.IntegrityError: (psycopg2.errors.NotNullViolation) null value in column "version" of relation "descriptive_data" violates not-null constraint
+DETAIL:  Failing row contains (71c725f5-30c4-4dc0-bb3f-49ea9568d0e0, null, Raphael, 2025-09-01, 2025-09-01 17:20:40.838566-04, 2025-09-01 17:20:40.838566-04, null, Barbieri Gateway WIN 4.6.42, Speclib Version: 5.29, Platform: Spectro LFP  ver:7.13 RT S2 S3 Sqb  itx1| GMN=18F00304..., null, null, D50, 2, null, null, 52, 70, 14, SAMPLE_ID	CMYK_C	CMYK_M	CMYK_Y	CMYK_K	XYZ_X	XYZ_Y	XYZ_Z	LAB_L	LA..., null, null, t, f, t, t, t, Test Decription 3, null, 2025-09-01 17:20:40.838566-04, 2025-09-01 17:20:40.838566-04, null, Project 3, Template S1, null).
+
+[SQL: INSERT INTO color_data.descriptive_data (measurement_id, project, template, measurement, print_date, creation_date, target_id, originator, device_model, device_serial_number, sample_backing, measurement_illumination, measurement_angle, measurement_condition, measurement_filter, number_of_fields, number_of_sets, row_length, data_format, sample_id, sample_name, cmyk, rgb, xyz, lab, spectral, description, status, firstdate, lastdate, version) VALUES (%(measurement_id)s::UUID, %(project)s, %(template)s, %(measurement)s, now(), now(), %(target_id)s, %(originator)s, %(device_model)s, %(device_serial_number)s, %(sample_backing)s, %(measurement_illumination)s, %(measurement_angle)s, %(measurement_condition)s, %(measurement_filter)s, %(number_of_fields)s, %(number_of_sets)s, %(row_length)s, %(data_format)s, %(sample_id)s, %(sample_name)s, %(cmyk)s, %(rgb)s, %(xyz)s, %(lab)s, %(spectral)s, %(description)s, %(status)s, now(), now(), %(version)s) RETURNING color_data.descriptive_data.print_date, color_data.descriptive_data.creation_date, color_data.descriptive_data.firstdate, color_data.descriptive_data.lastdate]
+[parameters: {'measurement_id': '71c725f5-30c4-4dc0-bb3f-49ea9568d0e0', 'project': 'Project 3', 'template': 'Template S1', 'measurement': 'Raphael', 'target_id': None, 'originator': 'Barbieri Gateway WIN 4.6.42, Speclib Version: 5.29', 'device_model': 'Platform: Spectro LFP  ver:7.13 RT S2 S3 Sqb  itx1| GMN=18F00304 | GSN=B9070665Spectral Unit: Spectro qb spectral unit  ver: 7.11 RT | GMN=18F00304 | GSN=B9070665 Transmission Unit: BAEL 99-2A  ver: 6.01 T | GMN=67111111Spectro LFPqb sensing unit 1 ver:1.30OK, DOC', 'device_serial_number': None, 'sample_backing': None, 'measurement_illumination': 'D50', 'measurement_angle': '2', 'measurement_condition': None, 'measurement_filter': None, 'number_of_fields': 52, 'number_of_sets': 70, 'row_length': 14, 'data_format': 'SAMPLE_ID\tCMYK_C\tCMYK_M\tCMYK_Y\tCMYK_K\tXYZ_X\tXYZ_Y\tXYZ_Z\tLAB_L\tLAB_A\tLAB_B\tSPECTRAL_380\tSPECTRAL_390\tSPECTRAL_400\tSPECTRAL_410\tSPECTRAL ... (359 characters truncated) ... CTRAL_680\tSPECTRAL_690\tSPECTRAL_700\tSPECTRAL_710\tSPECTRAL_720\tSPECTRAL_730\tSPECTRAL_740\tSPECTRAL_750\tSPECTRAL_760\tSPECTRAL_770\tSPECTRAL_780', 'sample_id': None, 'sample_name': None, 'cmyk': True, 'rgb': False, 'xyz': True, 'lab': True, 'spectral': True, 'description': 'Test Decription 3', 'status': None, 'version': None}]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
