@@ -9,6 +9,8 @@ pip install -r requirements.txt
 
 python3 loadJson.py  --path "/Users/aps/Documents/GitHub/colorDataToJson/Data" --json_file "printer.cie.json" --db "postgresql+psycopg2://pgadmin:postgres@10.211.55.9:5432/postgres" --dry-run --no-db-check --schema "color_measurement" --debug --verbose
 
+ python3 loadJson.py  --path "/Users/aps/Documents/GitHub/jsonToPostgres/Data" --json_file "printer.cie.json" --db "postgresql+psycopg2://pgadmin:postgres@10.211.55.9:5432/postgres"  --schema "color_measurement"  --verbose     
+
 
 ## Logs
 
