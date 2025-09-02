@@ -62,7 +62,7 @@ def _get_bold_button_font():
 # Loads JSON data into a dynamic SQLAlchemy schema in PostgreSQL.
 # Supports both descriptive and measurement data with flexible column mapping.
 #
-# Version: 1.0.2
+# Version: 1.0.3
 # Date: 2025-09-01
 # Changes:
 #   - Added robust logging to (source)/Logs with rotating file handler.
