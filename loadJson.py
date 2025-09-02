@@ -26,6 +26,24 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PREFS_DIR = SCRIPT_DIR / "Config"
 PREFS_PATH = PREFS_DIR / "loadJson_gui_prefs.json"
 
+#####################################################################
+# Loads JSON data into a dynamic SQLAlchemy schema in PostgreSQL.
+# Supports both descriptive and measurement data with flexible column mapping.
+#
+# Version: 1.0.3
+# Date: 2025-09-01
+# Changes:
+#   - Added robust logging to (source)/Logs with rotating file handler.
+#   - Default log filename now includes date: loadJson_YYYY-MM-DD.log.
+#   - Added --log-level and --log-file CLI flags.
+#   - Relative --log-file paths resolve against the script folder; on Windows, paths
+#     starting with '\' or '\\' are treated as absolute.
+#   - Redacts passwords in DB URLs within logs.
+#   - Logs split to stdout (INFO/WARN) and stderr (ERROR/CRITICAL).
+#   - Tkinter GUI buttons now enforce colors on macOS.
+#####################################################################
+
+
 def load_prefs() -> dict:
     try:
         if PREFS_PATH.exists():
@@ -59,20 +77,6 @@ def _get_bold_button_font():
     except Exception:
         return ("Segoe UI", 10, "bold")
 
-# Loads JSON data into a dynamic SQLAlchemy schema in PostgreSQL.
-# Supports both descriptive and measurement data with flexible column mapping.
-#
-# Version: 1.0.3
-# Date: 2025-09-01
-# Changes:
-#   - Added robust logging to (source)/Logs with rotating file handler.
-#   - Default log filename now includes date: loadJson_YYYY-MM-DD.log.
-#   - Added --log-level and --log-file CLI flags.
-#   - Relative --log-file paths resolve against the script folder; on Windows, paths
-#     starting with '\' or '\\' are treated as absolute.
-#   - Redacts passwords in DB URLs within logs.
-#   - Logs split to stdout (INFO/WARN) and stderr (ERROR/CRITICAL).
-#   - Tkinter GUI buttons now enforce colors on macOS; fallback to light gray with black text if themes override colors.
 
 def _extract_measurement_id_from_json(desc: dict, measurements: list) -> uuid.UUID | None:
     """
