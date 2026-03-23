@@ -2,9 +2,19 @@
  Loads JSON data into a dynamic SQLAlchemy schema in PostgreSQL.
  Supports both descriptive and measurement data with flexible column mapping.
 
- Version: 1.1.8
- Date: 2025-09-07
+ Version: 1.1.8.5
+ Date: 2026-03-22
  Changes:
+   - Fixed `AttributeError: module 'uuid' has no attribute 'uuid7'` for Python < 3.11 by adding a fallback to the `uuid6` library. Requires `pip install uuid6`.
+   - Corrected UUID handling: Uses standard `uuid` library. `uuid.UUID()` is used for parsing any existing UUID version from JSON/CLI, and `uuid.uuid7()` is used for generating new UUIDs. Removed `uuid6` dependency.
+   - Added status area to GUI to show which file is being processed.
+   - Added pre-flight check to detect and report duplicate SAMPLE_IDs in JSON, then abort.
+   - Corrected measurement_id precedence: JSON file > GUI/CLI override > New UUID.
+   - Changed new UUID generation from v4 to v7.
+   - Corrected logic to ensure measurement_id from JSON is used when no CLI/GUI override is provided.
+   - Fixed dry-run output to reflect the correct final measurement_id.
+   - Cleaned up function signatures by removing unused parameters.
+   - Removed redundant/conflicting code blocks for dry-run, logging, and measurement_id generation.
    - DB section: row1 = URI/Name/Port, row2 = Schema/Username/Password; fixed Show/Hide password button (uses *).
    - Combined Log level + Log file in one row; halved log level width; checkboxes in 2x2 grid; remember window size.
    - Fixed logging call that caused 'TypeError: not all arguments converted during string formatting'.
@@ -23,7 +33,6 @@
     - Added --no-db-check to skip DB connectivity check in dry run mode.
     - Added --dry-run to validate JSON and DB connection without performing inserts.
     - Added --verbose and --debug flags for more detailed logging.  
-- Date: 2025-09-07
 """
 
 import json
@@ -36,6 +45,20 @@ from pathlib import Path
 from datetime import datetime
 from collections import Counter
 from logging.handlers import RotatingFileHandler
+
+# --- UUIDv7 Backport for Python < 3.11 ---
+# Requires `pip install uuid6`
+try:
+    from uuid import uuid7
+except ImportError:
+    try:
+        from uuid6 import uuid7
+    except ImportError:
+        # Fallback to uuid4 if uuid6 is not installed
+        print("Warning: 'uuid6' library not found. Falling back to uuid.uuid4() for new UUIDs. "
+              "For time-sortable UUIDs (v7), please run: pip install uuid6", file=sys.stderr)
+        uuid7 = uuid.uuid4
+
 
 # Optional GUI imports (Tkinter)
 try:
@@ -67,7 +90,6 @@ def save_prefs(data: dict) -> None:
         PREFS_DIR.mkdir(parents=True, exist_ok=True)
         PREFS_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
     except Exception as e:
-        logger.error("Exception occurred", exc_info=True)
         logging.getLogger().warning(f"Could not save GUI prefs: {e}")
 
 # GUI font (bold) helper
@@ -121,7 +143,6 @@ def _extract_measurement_id_from_json(desc: dict, measurements: list) -> uuid.UU
     try:
         return uuid.UUID(only)
     except Exception as e:
-        logger.error("Exception occurred", exc_info=True)
         raise ValueError(f"Invalid MEASUREMENT_ID format in JSON: {only}") from e
 
 
@@ -135,36 +156,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.sql import func
 
 
-
-
-# === ENHANCED LOGGING SETUP WITH QUIET MODE AND LOGFILE OVERRIDE ===
-import logging
-import os
-from logging.handlers import RotatingFileHandler
-from datetime import datetime
-
-log_folder = os.path.join(os.path.dirname(__file__), "Logs")
-os.makedirs(log_folder, exist_ok=True)
-
-# Placeholder for dynamic log_file (set after parsing args)
-log_file = None
-
-# Setup basic logger and temporarily attach console output
-temp_console_handler = logging.StreamHandler()
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[temp_console_handler]
-)
-logger = logging.getLogger(__name__)
-# === END ENHANCED LOGGING SETUP WITH QUIET MODE AND LOGFILE OVERRIDE ===
-
-
 # ----------------------------
 # Config / Logging defaults
 # ----------------------------
-DEFAULT_SCHEMA = "color_data"  # "color_measurement"
+DEFAULT_SCHEMA = "color_data"
 DB_USERNAME = "pgadmin"
 DB_PASSWORD = "postgres"
 DB_PREFIX = "postgresql+psycopg2://"
@@ -195,22 +190,26 @@ def setup_logging(app_name: str = "loadJson", log_level: str = "INFO", log_file_
     """
     logger = logging.getLogger()
     if getattr(logger, "_configured", False):
+        # Re-configure level if called again
+        level = getattr(logging, log_level.upper(), logging.INFO)
+        for handler in logger.handlers:
+            handler.setLevel(level)
+        logger.setLevel(level)
         return logger
 
     # Levels
     level = getattr(logging, log_level.upper(), logging.INFO)
-    logger.setLevel(logging.DEBUG)  # capture all; handlers filter
+    logger.setLevel(level)
+    # Clear existing handlers from any previous basicConfig
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
 
     logs_dir = _ensure_logs_dir()
     if log_file_override:
         log_file = Path(log_file_override)
         log_file.parent.mkdir(parents=True, exist_ok=True)
     else:
-        # Use dated default log filename (keeps override working)
         log_file = logs_dir / f"{app_name}_{datetime.now().strftime('%Y-%m-%d')}.log"
-    
-    # else:
-    #    log_file = logs_dir / f"{app_name}.log"
 
     formatter = logging.Formatter(
         fmt="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
@@ -247,12 +246,16 @@ def setup_logging(app_name: str = "loadJson", log_level: str = "INFO", log_file_
 
     sys.excepthook = _excepthook
 
-    logger._configured = True  # type: ignore[attr-defined]
+    logger._configured = True
     logger.debug(f"Logging initialized. File: {log_file}")
     return logger
 
+# This will be re-assigned in main after args are parsed
+logger = logging.getLogger(__name__)
+
 def log(msg: str, level: int = logging.INFO):
-    logging.log(level, msg)
+    # Use the global logger instance
+    logger.log(level, msg)
 
 
 # ----------------------------
@@ -284,7 +287,7 @@ def make_models(schema: str):
         __tablename__ = "descriptive_data"
         __table_args__ = {"schema": schema}
 
-        measurement_id = Column(PG_UUID(as_uuid=True), default=uuid.uuid4, primary_key=True)
+        measurement_id = Column(PG_UUID(as_uuid=True), default=uuid7, primary_key=True)
         project = Column(Text)
         template = Column(Text)
         measurement = Column(Text)
@@ -389,7 +392,7 @@ def make_models(schema: str):
 # ----------------------------
 # Mapping helper
 # ----------------------------
-def build_descriptive_kwargs(desc_json: dict, model_cls, force_guid: None):
+def build_descriptive_kwargs(desc_json: dict, model_cls, force_guid: uuid.UUID | None = None):
     """
     Build kwargs for SQLAlchemy model from JSON:
     - Only include keys that exist as columns on the model.
@@ -433,10 +436,10 @@ def build_descriptive_kwargs(desc_json: dict, model_cls, force_guid: None):
 # ----------------------------
 # GUI (optional Tkinter)
 # ----------------------------
-def run_gui_with_prefs(initial_args) -> argparse.Namespace:
+def run_gui_with_prefs(initial_args) -> argparse.Namespace | None:
     """
     Launch a Tkinter GUI to capture all arguments.
-    Returns an argparse.Namespace with the selected values.
+    Returns an argparse.Namespace with the selected values, or None if cancelled.
     """
     if not TK_AVAILABLE:
         raise RuntimeError("Tkinter is not available in this environment.")
@@ -446,40 +449,27 @@ def run_gui_with_prefs(initial_args) -> argparse.Namespace:
     root = tk.Tk()
     root.title("loadJson — Arguments")
     style = ttk.Style(root)
-    style.configure("TLabelframe.Label", font=("TkDefaultFont", 11, "bold"))  # affects all
+    style.configure("TLabelframe.Label", font=("TkDefaultFont", 11, "bold"))
 
-    # Restore previous window size/position if available
-    geom = prefs.get("window_geometry")
-    if geom:
-        try:
-            root.geometry(geom)
-        except Exception:
-            root.geometry("900x415+5+10")
-    else:
+    geom = prefs.get("window_geometry", "900x415+5+10")
+    try:
+        root.geometry(geom)
+    except Exception:
         root.geometry("900x415+5+10")
-
-    # root.geometry("900x415+5+10")
    
     mainfrm = ttk.Frame(root, padding=16)
     mainfrm.pack(fill="both", expand=True)
 
-    # Helpers
     def field(row, label, var, width=60, browse=None, wrap=False, wrap_px=220):
-        # Ensure colon suffix
-        base = label.rstrip()
-        label_text = base if base.endswith(":") else base + ":"
-
-        lbl_kwargs = {"text": label_text, "anchor": "e"}  # right-align within cell
+        label_text = label.rstrip(":") + ":"
+        lbl_kwargs = {"text": label_text, "anchor": "e"}
         if wrap:
             lbl_kwargs["wraplength"] = wrap_px
-            lbl_kwargs["justify"] = "left"  # text lines themselves left-justified
-        # Bold label font
+            lbl_kwargs["justify"] = "left"
         lbl = ttk.Label(mainfrm, **lbl_kwargs)
         try:
             lbl.configure(font=_get_bold_label_font())
-        except Exception:
-            pass
-        # Right-justify in grid cell
+        except Exception: pass
         lbl.grid(row=row, column=0, sticky="e", pady=4)
 
         ent = ttk.Entry(mainfrm, textvariable=var, width=width)
@@ -492,90 +482,41 @@ def run_gui_with_prefs(initial_args) -> argparse.Namespace:
             ttk.Button(mainfrm, text="Browse…", command=lambda: var.set(filedialog.asksaveasfilename(initialdir=str(SCRIPT_DIR), defaultextension=".log"))).grid(row=row, column=2, padx=6)
         return ent
 
-    def boolbox(row, label, var):
-        cb = ttk.Checkbutton(mainfrm, text=label, variable=var)
-        cb.grid(row=row, column=1, sticky="w", pady=4)
-        return cb
-
-    def build_db_connection_section(parent,
-                                    v_db_uri,
-                                    v_db_name,
-                                    v_db_port,
-                                    v_username,
-                                    v_password,
-                                    v_schema):
-        """
-        Database section in two rows, three fields per row.
-
-        Row 0: Database URI | Database name | Database port
-        Row 1: Schema       | Username      | Password [+ Show/Hide]
-
-        Returns (frame, refs).
-        """
+    def build_db_connection_section(parent, v_db_uri, v_db_name, v_db_port, v_username, v_password, v_schema):
         frame = ttk.LabelFrame(parent, text="Database Connection", padding=(12, 10))
-
-        # Grid columns inside frame:
-        # 0: lbl1, 1: ent1, 2: lbl2, 3: ent2, 4: lbl3, 5: ent3, 6: extras (e.g., show/hide)
         for c in (1, 3, 5):
-            frame.columnconfigure(c, weight=1)  # entries expand
+            frame.columnconfigure(c, weight=1)
         frame.columnconfigure(6, weight=0)
 
         def add_pair(row, col0, label_text, textvar, show=None):
-            base = label_text.rstrip()
-            label_txt = base if base.endswith(":") else base + ":"
+            label_txt = label_text.rstrip(":") + ":"
             lbl = ttk.Label(frame, text=label_txt, anchor="e")
             try:
                 lbl.configure(font=_get_bold_label_font())
-            except Exception:
-                pass
+            except Exception: pass
             lbl.grid(row=row, column=col0, sticky="e", padx=(0, 8), pady=4)
             ent = ttk.Entry(frame, textvariable=textvar, show=show)
             ent.grid(row=row, column=col0 + 1, sticky="ew", padx=(0, 0), pady=4)
             return lbl, ent
 
-        # Row 0
-        _, ent_uri   = add_pair(0, 0, "Database URI",  v_db_uri)
-        _, ent_dbn   = add_pair(0, 2, "Database name", v_db_name)
-        _, ent_port  = add_pair(0, 4, "Database port", v_db_port)
-
-        # Row 1
-        _, ent_schema = add_pair(1, 0, "Schema",   v_schema)
-        _, ent_user   = add_pair(1, 2, "Username", v_username)
-
-        # Password with Show/Hide
-        mask_char = "*"
-        _, ent_pass = add_pair(1, 4, "Password", v_password, show=mask_char)
-        show_pw = tk.BooleanVar(value=False)
-
-         # Show/Hide password toggle
-        show_pw = tk.BooleanVar(value=False)
-        def toggle_pw():
-            ent_pass.configure(show="" if show_pw.get() else "•")
-            btn_pw.configure(text="Hide" if show_pw.get() else "Show")
-            show_pw.set(not show_pw.get())
-            ent_pass.focus_set()
-            ent_pass.selection_range(0, tk.END)
-         
-        btn_pw = ttk.Button(frame, text="Show", command=toggle_pw, width=6)
-        # Place to the right of password entry
-        btn_pw.grid(row=1, column=6, sticky="w", padx=(6, 0), pady=4)
+        add_pair(0, 0, "Database URI",  v_db_uri)
+        add_pair(0, 2, "Database name", v_db_name)
+        add_pair(0, 4, "Database port", v_db_port)
+        add_pair(1, 0, "Schema",   v_schema)
+        add_pair(1, 2, "Username", v_username)
+        _, ent_pass = add_pair(1, 4, "Password", v_password, show="*")
         
-        # Start with focus on the URI field
-        ent_uri.focus_set()
+        show_pw_var = tk.BooleanVar(value=False)
+        def toggle_pw():
+            ent_pass.configure(show="" if show_pw_var.get() else "*")
+        
+        btn_pw = ttk.Checkbutton(frame, text="Show", variable=show_pw_var, command=toggle_pw)
+        btn_pw.grid(row=1, column=6, sticky="w", padx=(6, 0), pady=4)
+        return frame
 
-        return frame, {
-            "ent_uri": ent_uri,
-            "ent_dbname": ent_dbn,
-            "ent_port": ent_port,
-            "ent_schema": ent_schema,
-            "ent_user": ent_user,
-            "ent_pass": ent_pass,
-            "btn_pw": btn_pw,
-            "show_pw": show_pw,
-        }
     v_path = tk.StringVar(value=prefs.get("path", initial_args.path if hasattr(initial_args, "path") else str(SCRIPT_DIR / "Data")))
     v_json = tk.StringVar(value=prefs.get("json_file", initial_args.json_file if hasattr(initial_args, "json_file") else "printer.cie.json"))
-    v_measid = tk.StringVar(value=prefs.get("measurement_id", getattr(initial_args, "measurement_id", "") or ""))
+    v_guid = tk.StringVar(value=prefs.get("guid", getattr(initial_args, "guid", "") or ""))
     v_db = tk.StringVar(value=prefs.get("db_uri", getattr(initial_args, "db_uri", "") or ""))
     v_db_port = tk.StringVar(value=prefs.get("db_port", getattr(initial_args, "db_port", "") or ""))
     v_db_name = tk.StringVar(value=prefs.get("db_name", getattr(initial_args, "db_name", "") or ""))
@@ -589,47 +530,34 @@ def run_gui_with_prefs(initial_args) -> argparse.Namespace:
     v_dry = tk.BooleanVar(value=prefs.get("dry_run", getattr(initial_args, "dry_run", False)))
     v_nocheck = tk.BooleanVar(value=prefs.get("no_db_check", getattr(initial_args, "no_db_check", False)))
 
-    # Grid config
-    for c in range(3):
-        mainfrm.columnconfigure(c, weight=1)
-
+    mainfrm.columnconfigure(1, weight=1)
     row = 0
     field(row, "Path (folder with JSON file)", v_path, browse="dir"); row += 1
     field(row, "JSON file name", v_json, browse="file"); row += 1
-    field(row, "Measurement ID (UUID, optional)", v_measid, wrap=True); row += 1
-    # Two-column Database Connection section (macOS-friendly)
-    db_section, _dbrefs = build_db_connection_section(
-        mainfrm, v_db, v_db_name, v_db_port, v_username, v_password, v_schema
-    )
-    # Span across all three main columns
-    db_section.grid(row=row, column=0, columnspan=3, sticky="nsew", padx=8, pady=6)
-    row += 1
+    field(row, "Measurement ID (UUID, optional)", v_guid, wrap=True); row += 1
+    
+    db_section = build_db_connection_section(mainfrm, v_db, v_db_name, v_db_port, v_username, v_password, v_schema)
+    db_section.grid(row=row, column=0, columnspan=3, sticky="nsew", padx=8, pady=6); row += 1
 
-    # Combined row: Log level (left) + Log file (right)
     logrow = ttk.Frame(mainfrm)
     logrow.grid(row=row, column=0, columnspan=3, sticky="ew", pady=4)
-    for c in (1, 3):
-        logrow.columnconfigure(c, weight=1)  # expand combo (col1) and file entry (col3)
-
-    # Log level (left side)
+    logrow.columnconfigure(1, weight=1)
+    logrow.columnconfigure(3, weight=1)
+    
     _lbl = ttk.Label(logrow, text="Log level:", anchor="e")
     try: _lbl.configure(font=_get_bold_label_font())
     except Exception: pass
     _lbl.grid(row=0, column=0, sticky="e", padx=(0,8))
-    cmb = ttk.Combobox(logrow, textvariable=v_loglevel, values=["DEBUG","INFO","WARNING","ERROR","CRITICAL"], state="readonly", width=10)
-    cmb.grid(row=0, column=1, sticky="w")
-
-    # Log file (right side)
+    ttk.Combobox(logrow, textvariable=v_loglevel, values=["DEBUG","INFO","WARNING","ERROR","CRITICAL"], state="readonly", width=10).grid(row=0, column=1, sticky="w")
+    
     _lf = ttk.Label(logrow, text="Log file (optional override):", anchor="e")
     try: _lf.configure(font=_get_bold_label_font())
     except Exception: pass
     _lf.grid(row=0, column=2, sticky="e", padx=(12,8))
-    ent_lf = ttk.Entry(logrow, textvariable=v_logfile)
-    ent_lf.grid(row=0, column=3, sticky="ew")
+    ttk.Entry(logrow, textvariable=v_logfile).grid(row=0, column=3, sticky="ew")
     ttk.Button(logrow, text="Browse…", command=lambda: v_logfile.set(filedialog.asksaveasfilename(title="Select log file", initialdir=str(SCRIPT_DIR), defaultextension=".log"))).grid(row=0, column=4, padx=6)
     row += 1
 
-    # Options checkboxes in 2 rows x 2 columns
     chkfrm = ttk.Frame(mainfrm)
     chkfrm.grid(row=row, column=0, columnspan=3, sticky="ew", pady=4)
     chkfrm.columnconfigure(0, weight=1)
@@ -640,182 +568,73 @@ def run_gui_with_prefs(initial_args) -> argparse.Namespace:
     ttk.Checkbutton(chkfrm, text="Verbose", variable=v_verbose).grid(row=1, column=1, sticky="w", padx=4, pady=2)
     row += 1
 
-    sep = ttk.Separator(mainfrm); sep.grid(row=row, column=0, columnspan=3, sticky="we", pady=8); row += 1
+    ttk.Separator(mainfrm).grid(row=row, column=0, columnspan=3, sticky="we", pady=8); row += 1
 
-    # Buttons (Cancel red, Execute blue-green)
-    # Helper: reliable colored buttons across platforms
     def make_colored_button(parent, text, command, variant="primary"):
-        """
-        Use tk.Button to ensure bg/fg colors apply on macOS/Windows/Linux.
-        Variants:
-          - "danger": red
-          - "primary": blue-green (teal)
-        Falls back to light gray with black text if the platform/theme refuses custom colors.
-        """
-        # Desired colors by variant (text always black)
+        fg, bg, afg, abg = ("black", "#1abc9c", "black", "#16a085")
         if variant == "danger":
             fg, bg, afg, abg = ("black", "#DC143C", "black", "#B22222")
-        else:
-            fg, bg, afg, abg = ("black", "#1abc9c", "black", "#16a085")  # teal primary
-
-        # Construct button
-        btn = tk.Button(
-            parent, text=text, command=command,
-            fg=fg, bg=bg, activeforeground=afg, activebackground=abg,
-            relief="raised", bd=1, highlightthickness=0, padx=12, pady=6,
-            font=_get_bold_button_font(),
-        )
-
-        # Try to make colors stick on macOS Aqua
-        try:
-            ws = btn.tk.call("tk", "windowingsystem")
-            if ws == "aqua":
-                # Help Aqua respect custom colors (colored outline)
-                btn.configure(highlightbackground=bg)
-
-            # If theme still overrides, detect and fallback to neutral
-            applied_bg = str(btn.cget("bg")).lower()
-            if applied_bg.startswith("system") or applied_bg in ("", "white"):
-                # fallback: neutral light gray with black text
-                btn.configure(fg="black", bg="#D9D9D9", activeforeground="black", activebackground="#C8C8C8")
-        except Exception:
-            # Any error -> safe fallback
-            btn.configure(fg="black", bg="#D9D9D9", activeforeground="black", activebackground="#C8C8C8")
-
+        btn = tk.Button(parent, text=text, command=command, fg=fg, bg=bg, activeforeground=afg, activebackground=abg, relief="raised", bd=1, highlightthickness=0, padx=12, pady=6, font=_get_bold_button_font())
         return btn
 
     msg_var = tk.StringVar(value="")
-    msgfrm = ttk.Frame(mainfrm)
-    msgfrm.grid(row=row, column=0, columnspan=3, sticky="ew", pady=(6,0))
-    msglbl = ttk.Label(msgfrm, textvariable=msg_var, foreground="#B22222")
-    msglbl.grid(row=0, column=0, sticky="w")
-    row += 1
+    ttk.Label(mainfrm, textvariable=msg_var, foreground="#B22222").grid(row=row, column=0, columnspan=3, sticky="ew", pady=(6,0)); row += 1
 
     btnfrm = ttk.Frame(mainfrm)
-    btnfrm.grid(row=row, column=0, columnspan=3, sticky="e", pady=8)
+    btnfrm.grid(row=row, column=0, columnspan=3, sticky="e", pady=8); row += 1
+
+    # --- Status Area ---
+    status_frame = ttk.LabelFrame(mainfrm, text="Status", padding=(12, 10))
+    status_frame.grid(row=row, column=0, columnspan=3, sticky="nsew", padx=8, pady=6)
+    status_frame.grid_remove() # Hide by default
+    status_var = tk.StringVar()
+    status_label = ttk.Label(status_frame, textvariable=status_var, wraplength=800, justify="left")
+    status_label.pack(fill="x", expand=True)
+    row += 1
+
 
     def on_cancel():
-        # Save window geometry before exit
-        try:
-            gp = load_prefs()
-        except Exception:
-            gp = {}
-        gp["window_geometry"] = root.winfo_geometry()
-        try:
-            save_prefs(gp)
-        except Exception:
-            pass
+        prefs_to_save = {"window_geometry": root.winfo_geometry()}
+        save_prefs(prefs_to_save)
         root.destroy()
-        raise SystemExit(0)
+        sys.exit(0)
+
     def on_execute():
-        # persist prefs
+        # --- Validation ---
+        msg_var.set("") # Clear previous errors
+        _json_path = Path(v_path.get().strip()) / v_json.get().strip()
+        if not _json_path.exists():
+            msg_var.set(f"Error: JSON file not found: {_json_path}"); return
+
+        try:
+            if v_guid.get().strip():
+                uuid.UUID(v_guid.get().strip())
+        except ValueError:
+            msg_var.set(f"Error: Invalid Measurement ID format. Must be a valid UUID."); return
+
+        # --- GUI Feedback ---
+        status_var.set(f"Processing file: {_json_path.resolve()}")
+        status_frame.grid() # Show status frame
+        btn_exec.config(state="disabled", text="Processing...")
+        btn_cancel.config(state="disabled")
+        root.update_idletasks() # Force GUI to redraw immediately
+
+        # --- Save Prefs & Quit ---
         payload = {
-            "path": v_path.get(),
-            "json_file": v_json.get(),
-            "measurement_id": v_measid.get(),
-            "db_uri": v_db.get(),
-            "db_port": v_db_port.get(),
-            "db_name": v_db_name.get(),
-            "username": v_username.get(),
-            "password": v_password.get(),
-            "schema": v_schema.get(),
-            "log_level": v_loglevel.get(),
-            "log_file": v_logfile.get(),
-            "debug": bool(v_debug.get()),
-            "verbose": bool(v_verbose.get()),
-            "dry_run": bool(v_dry.get()),
-            "no_db_check": bool(v_nocheck.get()),
+            "path": v_path.get(), "json_file": v_json.get(), "guid": v_guid.get(),
+            "db_uri": v_db.get(), "db_port": v_db_port.get(), "db_name": v_db_name.get(),
+            "username": v_username.get(), "password": v_password.get(), "schema": v_schema.get(),
+            "log_level": v_loglevel.get(), "log_file": v_logfile.get(),
+            "debug": bool(v_debug.get()), "verbose": bool(v_verbose.get()),
+            "dry_run": bool(v_dry.get()), "no_db_check": bool(v_nocheck.get()),
             "window_geometry": root.winfo_geometry(),
         }
-        # --- Duplicate measurement_id guard in GUI before closing ---
-        try:
-            # Resolve schema and DB URI
-            _username = (v_username.get().strip() or DB_USERNAME)
-            _password = (v_password.get().strip() or DB_PASSWORD)
-            _host = (v_db.get().strip() or DB_URI)
-            _port = (v_db_port.get().strip() or DB_PORT)
-            _dbname = (v_db_name.get().strip() or DB_NAME)
-            _schema = (v_schema.get().strip() or DEFAULT_SCHEMA)
-            _db_uri_full = f"{DB_PREFIX}{_username}:{_password}@{_host}:{_port}/{_dbname}"
-
-            # Determine target measurement_id (GUI override if provided)
-            _force_guid = None
-            _meid_txt = (v_measid.get() or "").strip()
-            if _meid_txt:
-                try:
-                    _force_guid = uuid.UUID(_meid_txt)
-                except Exception as _e:
-                    msg_var.set(f"Error: Invalid measurement_id format: {_meid_txt}")
-                    return
-
-            # Load JSON and extract ID if needed
-            import os, json as _json
-            _json_path = os.path.join(v_path.get().strip(), v_json.get().strip())
-            try:
-                with open(_json_path, "r", encoding="utf-8") as _f:
-                    _data = _json.load(_f)
-            except Exception as _e:
-                msg_var.set(f"Error: Could not open JSON file: {_json_path}")
-                return
-
-            _desc = _data.get("descriptive_data", {}) or {}
-            _meas = _data.get("measurement_data", []) or []
-            _json_guid = None
-            try:
-                _json_guid = _extract_measurement_id_from_json(_desc, _meas)
-            except Exception as _e:
-                msg_var.set(f"Error: {_e}")
-                return
-            _guid_final = _force_guid or _json_guid or uuid.uuid4()
-
-            # Build engine once
-            _engine = create_engine(_db_uri_full, echo=False)
-
-            # If user did NOT check 'Skip DB connectivity check', preflight ping
-            if not bool(v_nocheck.get()):
-                try:
-                    with _engine.connect() as _conn:
-                        _conn.execute(text("SELECT 1"))
-                except Exception as _e:
-                    logger.error("Exception occurred", exc_info=True)
-                    logger.critical(f"DB connectivity FAILED -> {_redact_url(_db_uri_full)} | {_e}")
-                    try:
-                        _engine.dispose()
-                    except Exception:
-                        pass
-                    msg_var.set("Error: DB connectivity failed; insert halted")
-                    return
-
-            # Query DB for existing descriptive_data with same measurement_id
-            try:
-                with _engine.connect() as _conn:
-                    _res = _conn.execute(text(f'SELECT 1 FROM "{_schema}".descriptive_data WHERE measurement_id = :mid LIMIT 1'), {"mid": _guid_final})
-                    if _res.first():
-                        msg_var.set(f"Error: Measurement with the measurement_id: {_guid_final} exist; insert halted")
-                        try:
-                            _engine.dispose()
-                        except Exception:
-                            pass
-                        return
-            except Exception as _e:
-                # Surface DB errors in the GUI
-                msg_var.set(f"Error: DB check failed — {_e}")
-                try:
-                    _engine.dispose()
-                except Exception:
-                    pass
-                return
-            try:
-                _engine.dispose()
-            except Exception:
-                pass
-        except Exception as _e:
-            msg_var.set(f"Error: {_e}")
-            return
         save_prefs(payload)
-        root.quit()
+        
+        # Short delay to ensure user sees the message, then close
+        root.after(1500, root.quit)
 
-    # Use helper for reliable colored buttons
+
     btn_cancel = make_colored_button(btnfrm, "Cancel", on_cancel, variant="danger")
     btn_exec = make_colored_button(btnfrm, "Execute", on_execute, variant="primary")
     btn_cancel.pack(side="left", padx=6)
@@ -825,265 +644,146 @@ def run_gui_with_prefs(initial_args) -> argparse.Namespace:
     root.mainloop()
     root.destroy()
 
-    # Build argparse-like namespace
-    ns = argparse.Namespace(
-        path=v_path.get(),
-        json_file=v_json.get(),
-        measurement_id=v_measid.get().strip() or None,
-        db_uri=v_db.get().strip() or None,
-        db_port=v_db_port.get().strip() or None,
-        db_name=v_db_name.get().strip() or None,    
-        username=v_username.get().strip() or None,
-        password=v_password.get().strip() or None,
-        schema=v_schema.get().strip() or DEFAULT_SCHEMA,
-        log_level=v_loglevel.get(),
-        log_file=v_logfile.get().strip() or None,
-        debug=bool(v_debug.get()),
-        verbose=bool(v_verbose.get()),
-        dry_run=bool(v_dry.get()),
-        no_db_check=bool(v_nocheck.get()),
-        gui=True,
+    return argparse.Namespace(
+        path=v_path.get(), json_file=v_json.get(), guid=v_guid.get().strip() or None,
+        db_uri=v_db.get().strip() or None, db_port=v_db_port.get().strip() or None,
+        db_name=v_db_name.get().strip() or None, username=v_username.get().strip() or None,
+        password=v_password.get().strip() or None, schema=v_schema.get().strip() or DEFAULT_SCHEMA,
+        log_level=v_loglevel.get(), log_file=v_logfile.get().strip() or None,
+        debug=bool(v_debug.get()), verbose=bool(v_verbose.get()),
+        dry_run=bool(v_dry.get()), no_db_check=bool(v_nocheck.get()), gui=True,
     )
-    return ns
 
 
 # ----------------------------
 # Core
 # ----------------------------
-def process_file(json_file: Path, guid: None, db_uri: str, dry_run: bool = False, no_db_check: bool = False, schema: str = DEFAULT_SCHEMA, force_guid: uuid.UUID | None = None, gui: bool = False):
+def process_file(json_file: Path, db_uri: str, dry_run: bool = False, no_db_check: bool = False, schema: str = DEFAULT_SCHEMA, force_guid: uuid.UUID | None = None):
     engine = create_engine(db_uri, echo=False)
-
     log("SQLAlchemy engine created.", logging.DEBUG)
 
-    # ## PREFLIGHT CONNECTIVITY CHECK ##
-    if not no_db_check:
-        try:
-            with engine.connect() as _conn:
-                _conn.execute(text("SELECT 1"))
-            log(f"DB connectivity: OK -> {_redact_url(str(engine.url))}", logging.INFO)
-        except Exception as e:
-            logger.error("Exception occurred", exc_info=True)
-            log(f"DB connectivity FAILED -> {_redact_url(str(engine.url))}\\n{e}", logging.CRITICAL)
-            try:
-                engine.dispose()
-            finally:
-                raise SystemExit(2)
+    try:
+        with open(json_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        log(f"Error: JSON file not found at '{json_file}'", logging.CRITICAL)
+        raise SystemExit(1)
+    except json.JSONDecodeError:
+        log(f"Error: Could not decode JSON from '{json_file}'. Check for syntax errors.", logging.CRITICAL)
+        raise SystemExit(1)
 
+    desc = data.get("descriptive_data", {}) or {}
+    measurements = data.get("measurement_data", []) or []
 
-    # Ensure schema exists (auto-create)
-    # --- EARLY DRY-RUN EXIT (no DB mutations) ---
+    # Determine final measurement_id: JSON > CLI/GUI > New UUIDv7
+    json_guid = _extract_measurement_id_from_json(desc, measurements)
+    guid_final = json_guid or force_guid or uuid7()
+    log(f"Using measurement_id: {guid_final}", logging.INFO)
+    if json_guid:
+        log("ID source: Found in JSON file.", logging.DEBUG)
+    elif force_guid:
+        log("ID source: Provided by CLI/GUI override.", logging.DEBUG)
+    else:
+        log("ID source: Generated new UUIDv7.", logging.DEBUG)
+
+    # --- DRY-RUN LOGIC ---
     if dry_run:
         log('Dry-run mode: Skipping all database inserts.', logging.INFO)
         log(f"Dry-run against DB: {_redact_url(db_uri)}", logging.INFO)
-        import json as _json
-        with open(json_file, "r", encoding="utf-8") as _f:
-            _data = json.load(_f)
-        _desc = _data.get("descriptive_data", {}) or {}
-        _measurements = _data.get("measurement_data", []) or []
-        # Determine measurement_id
-        _guid_final = force_guid or _extract_measurement_id_from_json(_desc, _measurements) or uuid.uuid4()
-        # Normalize rows & basic validation
-        _cleaned = []
-        for _row in _measurements:
-            _row["MEASUREMENT_ID"] = _guid_final
-            if not _row.get("MEASUREMENT_ID"):
-                raise ValueError(f"Missing MEASUREMENT_ID in row: {_row}")
-            if "SAMPLE_ID" not in _row:
-                raise ValueError(f"Missing SAMPLE_ID in row: {_row}")
-            _cleaned.append(_row)
-        # Duplicate guard
-        from collections import Counter as _Counter
-        _pairs = [(_r["MEASUREMENT_ID"], _r["SAMPLE_ID"]) for _r in _cleaned]
-        _dupes = [k for k, v in _Counter(_pairs).items() if v > 1]
-        if _dupes:
-            raise ValueError(f"Duplicate (measurement_id, sample_id) pairs found: {_dupes}")
-        # Build descriptive kwargs (force_guid applied inside)
-        _Base, _DescriptiveData, _MeasurementData = make_models(schema)
-        _desc_kwargs = build_descriptive_kwargs(_desc, _DescriptiveData, force_guid=force_guid)
-        logger.info("\n--- DRY RUN SAMPLE OUTPUT ---")
-        logger.info("Schema: %s", schema)
-        logger.info("DescriptiveData (kwargs that will be inserted):")
-        logger.info(_json.dumps(_desc_kwargs, indent=4, default=str))
-        if _cleaned:
-            logger.info("\nFirst 3 MeasurementData rows:")
-            for _sample_row in _cleaned[:3]:
-                logger.info(_json.dumps(_sample_row, indent=4, default=str))
-        # Optional DB connectivity check
+        
+        Base, DescriptiveData, MeasurementData = make_models(schema)
+        desc_kwargs = build_descriptive_kwargs(desc, DescriptiveData, force_guid=guid_final)
+        
+        log("\n--- DRY RUN SAMPLE OUTPUT ---")
+        log(f"Schema: {schema}")
+        log("DescriptiveData (kwargs that will be inserted):")
+        log(json.dumps(desc_kwargs, indent=4, default=str))
+        
+        if measurements:
+            log("\nFirst 3 MeasurementData rows (after normalization):")
+            for i, row in enumerate(measurements[:3]):
+                row["MEASUREMENT_ID"] = guid_final
+                log(json.dumps(row, indent=4, default=str))
+        
         if not no_db_check:
             try:
-                with engine.connect() as _conn:
-                    _conn.execute(text("SELECT 1"))
-                logger.info(f"DB connectivity: OK -> {_redact_url(str(engine.url))}")
-            except Exception as _e:
-                logger.error("Exception occurred", exc_info=True)
-                logger.critical(f"DB connectivity FAILED -> {_redact_url(str(engine.url))} | {str(_e)}")
-                try:
-                    engine.dispose()
-                finally:
-                    raise SystemExit(2)
+                with engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                log(f"DB connectivity check: OK -> {_redact_url(str(engine.url))}")
+            except Exception as e:
+                log(f"DB connectivity check FAILED: {e}", logging.ERROR)
+        
+        log("--- END DRY RUN ---")
+        return # Exit after dry run
 
-        logger.info("--- END SAMPLE OUTPUT ---\n")
-        logger.info("\nPlanned index statements:")
-        logger.info(f'CREATE INDEX IF NOT EXISTS idx_measurement_sample ON "{schema}".measurement_data (measurement_id, sample_id)')
-        logger.info(f'CREATE INDEX IF NOT EXISTS idx_measurement_id ON "{schema}".measurement_data (measurement_id)')
-        logger.info(f'CREATE INDEX IF NOT EXISTS idx_sample_id ON "{schema}".measurement_data (sample_id)\n')
-        return
+    # --- LIVE RUN LOGIC ---
+    if not no_db_check:
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            log(f"DB connectivity: OK -> {_redact_url(str(engine.url))}", logging.INFO)
+        except Exception as e:
+            log(f"DB connectivity FAILED -> {_redact_url(str(engine.url))}\n{e}", logging.CRITICAL)
+            raise SystemExit(2)
+
     ensure_schema(engine, schema)
-
-    # Build models bound to this schema
     Base, DescriptiveData, MeasurementData = make_models(schema)
-
-    # Create tables if missing
     Base.metadata.create_all(engine)
-    # Ensure new columns exist (idempotent for existing DBs)
-    with engine.connect() as conn:
-        conn.execute(text(f'ALTER TABLE "{schema}".descriptive_data ADD COLUMN IF NOT EXISTS project TEXT'))
-        conn.execute(text(f'ALTER TABLE "{schema}".descriptive_data ADD COLUMN IF NOT EXISTS template TEXT'))
-        conn.execute(text(f'ALTER TABLE "{schema}".descriptive_data ADD COLUMN IF NOT EXISTS parsed_date TEXT'))
-        conn.commit()
-    log("Schema up-to-date: ensured project, template, parsed_date columns.", logging.INFO)
-    # Create indexes for performance
-    with engine.connect() as conn:
-        conn.execute(text(f'CREATE INDEX IF NOT EXISTS idx_measurement_sample ON "{schema}".measurement_data (measurement_id, sample_id)'))
-        conn.execute(text(f'CREATE INDEX IF NOT EXISTS idx_measurement_id ON "{schema}".measurement_data (measurement_id)'))
-        conn.execute(text(f'CREATE INDEX IF NOT EXISTS idx_sample_id ON "{schema}".measurement_data (sample_id)'))
-        conn.commit()
-    log("Indexes ensured on measurement_data table.", logging.INFO)
 
     Session = sessionmaker(bind=engine)
-    session = Session()
-
-    with open(json_file, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-        # === PATCH: Generate new MEASUREMENT_ID if does not exist ===
-        descriptive_data = data.get("descriptive_data", {})
-        if not ("MEASUREMENT_ID" in descriptive_data and descriptive_data["MEASUREMENT_ID"].strip()):
-            logger.info("MEASUREMENT_ID missing in descriptive_data. Generating new MEASUREMENT_ID.")
-            new_measurement_id = str(uuid.uuid4())
-            descriptive_data["MEASUREMENT_ID"] = new_measurement_id
-            for item in data.get("measurement_data", []):
-                item["MEASUREMENT_ID"] = new_measurement_id
-        # === END PATCH ===
-
-
-        desc = data.get("descriptive_data", {}) or {}
-        measurements = data.get("measurement_data", []) or []
-
-        # Determine measurement_id: prefer CLI arg, else JSON, else generate new
-        guid_final = force_guid or _extract_measurement_id_from_json(desc, measurements) or uuid.uuid4()
-
-        log(f"Using measurement_id: {guid_final}", logging.INFO)
-        
-        # Force the SAME guid into each measurement row and basic validation
-        cleaned_measurements = []
-        for row in measurements:
-            row["MEASUREMENT_ID"] = guid_final  # keep as uuid.UUID consistently
-            if not row.get("MEASUREMENT_ID"):
-                raise ValueError(f"Missing MEASUREMENT_ID in row: {row}")
-            if "SAMPLE_ID" not in row:
-                raise ValueError(f"Missing SAMPLE_ID in row: {row}")
-            cleaned_measurements.append(row)
-
-        # Duplicate (measurement_id, sample_id) guard
-        pairs = [(r["MEASUREMENT_ID"], r["SAMPLE_ID"]) for r in cleaned_measurements]
-        dupes = [k for k, v in Counter(pairs).items() if v > 1]
-        if dupes:
-            raise ValueError(f"Duplicate (measurement_id, sample_id) pairs found: {dupes}")
-
-        # DescriptiveData: filtered kwargs (ignore missing + ignore extra) with SAME guid
-        descriptive_entry = DescriptiveData(**build_descriptive_kwargs(desc, DescriptiveData, force_guid=force_guid))
-
-        # Dry-run: print sample + optional DB connectivity check, then exit
-        if dry_run:
-            log('Dry-run mode: Skipping all database inserts.', logging.INFO)
-            log(f"Dry-run against DB: {_redact_url(db_uri)}", logging.INFO)
-            # Show sample data
-            import json as _json
-            logger.info("\n--- DRY RUN SAMPLE OUTPUT ---")
-            logger.info("Schema: %s", schema)
-            logger.info("DescriptiveData:")
-            logger.info(_json.dumps(build_descriptive_kwargs(desc, DescriptiveData, force_guid=force_guid), indent=4, default=str))
-            if cleaned_measurements:
-                logger.info("\nFirst 3 MeasurementData rows:")
-                for sample_row in cleaned_measurements[:3]:
-                    logger.info(_json.dumps(sample_row, indent=4, default=str))
-            # Check DB connectivity if not disabled
-            if not no_db_check:
-                try:
-                    with engine.connect() as conn:
-                        conn.execute(text("SELECT 1"))
-                    logger.info(f"DB connectivity: OK -> {_redact_url(str(engine.url))}")
-                except Exception as e:
-                    logger.error("Exception occurred", exc_info=True)
-                    logger.info(f"DB connectivity: FAILED -> {_redact_url(str(engine.url))}\n{e}")
-            
-            logger.info("--- END SAMPLE OUTPUT ---\n")
-            logger.info("\nPlanned index statements:")
-            logger.info(f'CREATE INDEX IF NOT EXISTS idx_measurement_sample ON "{schema}".measurement_data (measurement_id, sample_id)')
-            logger.info(f'CREATE INDEX IF NOT EXISTS idx_measurement_id ON "{schema}".measurement_data (measurement_id)')
-            logger.info(f'CREATE INDEX IF NOT EXISTS idx_sample_id ON "{schema}".measurement_data (sample_id)\n')
-        
-            session.close()
-
-
-        # --- Duplicate measurement_id guard (non-GUI/CLI path) ---
+    with Session() as session:
         try:
-            with engine.connect() as _conn:
-                _dup = _conn.execute(text(f'SELECT 1 FROM "{schema}".descriptive_data WHERE measurement_id = :mid LIMIT 1'), {"mid": guid_final}).first()
-            if _dup:
-                _msg = f"Measurement with the measurement_id: {guid_final} exist; insert halted"
-                log(_msg, logging.CRITICAL)
-                return
-        except Exception as _e:
-            logger.error("Exception occurred during duplicate check", exc_info=True)
-            raise
-            # --- Insert section ---
-        try:
+            # Check for existing measurement_id
+            existing = session.query(DescriptiveData).filter_by(measurement_id=guid_final).first()
+            if existing:
+                log(f"Measurement ID {guid_final} already exists. Aborting.", logging.ERROR)
+                raise SystemExit(3)
+
+            # --- PRE-FLIGHT CHECK FOR DUPLICATE SAMPLE_IDs ---
+            if measurements:
+                sample_ids = [row.get("SAMPLE_ID") for row in measurements]
+                id_counts = Counter(sample_ids)
+                duplicates = {sid: count for sid, count in id_counts.items() if count > 1 and sid is not None}
+                if duplicates:
+                    log(f"Error: Duplicate SAMPLE_ID values found in JSON file. Cannot insert.", logging.CRITICAL)
+                    for sid, count in duplicates.items():
+                        log(f"  - SAMPLE_ID '{sid}' appears {count} times.", logging.ERROR)
+                    raise SystemExit(4)
+
+            # Prepare descriptive data
+            descriptive_entry = DescriptiveData(**build_descriptive_kwargs(desc, DescriptiveData, force_guid=guid_final))
             session.add(descriptive_entry)
-            session.commit()
-            session.refresh(descriptive_entry)
-            log("DescriptiveData entry committed successfully.", logging.INFO)
-        except SQLAlchemyError as e:
-            logger.error("Exception occurred", exc_info=True)
-            session.rollback()
-            log(f"Error inserting DescriptiveData: {e}", logging.ERROR)
-            logging.getLogger().exception("DescriptiveData insert failed")
-            raise
 
-        for row in cleaned_measurements:
-            base_fields = {
-                "measurement_id": guid_final,  # enforce same UUID
-                "sample_id": int(row["SAMPLE_ID"]),
-                "cmyk_c": row.get("CMYK_C"),
-                "cmyk_m": row.get("CMYK_M"),
-                "cmyk_y": row.get("CMYK_Y"),
-                "cmyk_k": row.get("CMYK_K"),
-                "xyz_x": row.get("XYZ_X"),
-                "xyz_y": row.get("XYZ_Y"),
-                "xyz_z": row.get("XYZ_Z"),
-                "lab_l": row.get("LAB_L"),
-                "lab_a": row.get("LAB_A"),
-                "lab_b": row.get("LAB_B"),
-            }
-            spectral_fields = {
-                f'spectral_{wavelength}': row.get(f"SPECTRAL_{wavelength}", None)
-                for wavelength in range(380, 781, 10)
-            }
-            measurement_entry = MeasurementData(**base_fields, **spectral_fields)
-            try:
-                session.add(measurement_entry)
-                session.commit()
-                session.refresh(measurement_entry)
-                log(f"Measurement entry for sample_id {measurement_entry.sample_id} committed.", logging.INFO)
-            except SQLAlchemyError as e:
-                logger.error("Exception occurred", exc_info=True)
-                session.rollback()
-                log(f"Error inserting MeasurementData (sample_id={row.get('SAMPLE_ID')}): {e}", logging.ERROR)
-                logging.getLogger().exception("MeasurementData insert failed")
-                raise
-            finally:
-                session.close()
+            # Prepare measurement data
+            cleaned_measurements = []
+            for row in measurements:
+                insert_data = {"measurement_id": guid_final, "sample_id": int(row["SAMPLE_ID"])}
+                for key, value in row.items():
+                    col_name = key.lower()
+                    # Map common data types
+                    if col_name in ("cmyk_c", "cmyk_m", "cmyk_y", "cmyk_k", "xyz_x", "xyz_y", "xyz_z", "lab_l", "lab_a", "lab_b") or col_name.startswith("spectral_"):
+                        insert_data[col_name] = float(value) if value is not None else None
+                cleaned_measurements.append(insert_data)
+
+            # Bulk insert for performance
+            if cleaned_measurements:
+                session.bulk_insert_mappings(MeasurementData, cleaned_measurements)
+            
+            session.commit()
+            log("Database transaction committed successfully.", logging.INFO)
+
+        except (SQLAlchemyError, ValueError) as e:
+            log(f"An error occurred during the database operation: {e}", logging.CRITICAL)
+            logger.exception("Database operation failed")
+            session.rollback()
+            raise SystemExit(1)
+        except Exception as e:
+            log(f"An unexpected error occurred: {e}", logging.CRITICAL)
+            logger.exception("Unexpected error")
+            session.rollback()
+            raise SystemExit(1)
+        finally:
+            engine.dispose()
 
 
 # ----------------------------
@@ -1091,109 +791,92 @@ def process_file(json_file: Path, guid: None, db_uri: str, dry_run: bool = False
 # ----------------------------
 def main():
     parser = argparse.ArgumentParser(description="Load measurement JSON into Postgres.")
-    parser.add_argument("--quiet", action="store_true", help="Disable console log output")
-    parser.add_argument("--path", default="/Users/aps/Documents/GitHub/colorDataToJson/Data", help="Folder path containing JSON file")
+    parser.add_argument("--path", default=str(SCRIPT_DIR / "Data"), help="Folder path containing JSON file")
     parser.add_argument("--json_file", default="printer.cie.json", help="JSON file name")
-    parser.add_argument(
-        "--measurement-id",
-        dest="measurement_id",
-        help="Override MEASUREMENT_ID/measurement_id (if set, overrides JSON; else JSON value is used; else a new UUIDv4 is generated)",
-    )
-    parser.add_argument("--db", dest="db_uri", help="Override database connection spec + URL")
-    parser.add_argument("--db-port", dest="db_port", help="Override database port")
-    parser.add_argument("--db-name", dest="db_name", help="Override database name")
-    parser.add_argument("--username", help="Database username (default: pgadmin)")
-    parser.add_argument("--password", help="Database password (default: postgres)")
+    parser.add_argument("--guid", help="Override MEASUREMENT_ID (UUID). Overrides JSON value if JSON has no ID.")
+    parser.add_argument("--db-uri", help="Override database connection host/IP")
+    parser.add_argument("--db-port", help="Override database port")
+    parser.add_argument("--db-name", help="Override database name")
+    parser.add_argument("--username", help=f"Database username (default: {DB_USERNAME})")
+    parser.add_argument("--password", help=f"Database password (default: {DB_PASSWORD})")
     parser.add_argument("--dry-run", action="store_true", help="Validate and log but do not insert into database")
     parser.add_argument("--no-db-check", action="store_true", help="Skip DB connectivity check during --dry-run")
-    parser.add_argument("--schema", default=DEFAULT_SCHEMA, help="Target schema name (auto-created if missing)")
-    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
-    parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
-    parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-                        help="Log verbosity for file/stdout handlers (default: INFO)")
-    parser.add_argument("--log-file", help="Optional override path for log file (default: (source)/Logs/loadJson_YYYY-MM-DD.log)")
-    parser.add_argument("--logsize", type=int, default=5, help="Max log file size in MB before rotation (default: 5MB)")
-    parser.add_argument("--logbackups", type=int, default=3, help="Number of rotated backups to keep (default: 3)")
-    parser.add_argument("--jsonlog", action="store_true", help="Enable JSON-formatted log output")
+    parser.add_argument("--schema", default=DEFAULT_SCHEMA, help=f"Target schema name (default: {DEFAULT_SCHEMA})")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging (overrides --log-level).")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose (INFO) logging.")
+    parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], help="Log verbosity (default: INFO)")
+    parser.add_argument("--log-file", help="Optional override path for log file.")
     parser.add_argument("--gui", action="store_true", help="Launch Tkinter GUI to enter arguments")
     args = parser.parse_args()
 
-    # === LOG LEVEL TOGGLE ===
-    log_level = logging.DEBUG if args.debug else logging.INFO
-    for handler in logging.getLogger().handlers:
-        handler.setLevel(log_level)
-    logger.setLevel(log_level)
-    # === END LOG LEVEL TOGGLE ===
-
     # If GUI requested (and available), collect args via GUI
-    if getattr(args, "gui", False):
+    if args.gui:
         if not TK_AVAILABLE:
-            raise RuntimeError("Tkinter GUI requested but Tkinter is not available.")
-        args = run_gui_with_prefs(args)
+            logging.critical("GUI requested but Tkinter is not available.")
+            sys.exit(1)
+        gui_args = run_gui_with_prefs(args)
+        if gui_args is None:
+            print("Operation cancelled by user.")
+            sys.exit(0)
+        args = gui_args
 
-    log("Starting loadJson.py", logging.INFO)
-
-    # Determine desired log level (debug flag overrides)
-    desired_level = "DEBUG" if args.debug else (args.log_level if args.verbose is False else args.log_level)
-
-    # Resolve optional --log-file (relative paths resolved against SCRIPT_DIR)
+    # Determine desired log level
+    log_level = "DEBUG" if args.debug else ("INFO" if args.verbose else args.log_level)
+    
     log_override = None
-    if hasattr(args, "log_file") and args.log_file:
+    if args.log_file:
         raw = Path(args.log_file).expanduser()
-        # Treat absolute paths or (on Windows) leading backslash as absolute
-        if raw.is_absolute() or str(raw).startswith("\\\\") or str(raw).startswith("\\"):
-            log_override = raw
-        else:
-            SCRIPT_DIR = Path(__file__).resolve().parent
-            log_override = (SCRIPT_DIR / raw).resolve()
+        log_override = (SCRIPT_DIR / raw).resolve() if not raw.is_absolute() else raw
 
-    setup_logging(app_name="loadJson", log_level=desired_level, log_file_override=log_override)
+    # Setup logging using the parsed arguments
+    global logger
+    logger = setup_logging(app_name="loadJson", log_level=log_level, log_file_override=log_override)
+    
+    log("Starting loadJson.py", logging.INFO)
 
     json_file = Path(args.path) / args.json_file
     if not json_file.exists():
-        raise FileNotFoundError(f"JSON file not found: {json_file}")
+        log(f"JSON file not found: {json_file}", logging.CRITICAL)
+        raise SystemExit(1)
 
-    # Determine measurement_id
-    guid = None
-    if args.measurement_id:
+    # Determine measurement_id from --guid flag
+    force_guid = None
+    if args.guid:
         try:
-            guid = uuid.UUID(args.measurement_id)
+            force_guid = uuid.UUID(args.guid)
         except ValueError:
-            raise ValueError(f"Invalid UUID format: {args.measurement_id}")
-    else:
-        guid = None;
-    
+            log(f"Invalid --guid format: {args.guid}", logging.CRITICAL)
+            raise SystemExit(1)
 
-    # Override DB connection parameters from args if provided
-    DB_USERNAME = args.username or DB_USERNAME
-    DB_PASSWORD = args.password or DB_PASSWORD
-    DB_NAME = args.db_name or DB_NAME
-    DB_PORT = args.db_port or DB_PORT
-    DB_URI = args.db_uri or DB_URI
+    # Build DB connection URI from parts
+    db_user = args.username or DB_USERNAME
+    db_pass = args.password or DB_PASSWORD
+    db_host = args.db_uri or DB_URI
+    db_port = args.db_port or DB_PORT
+    db_name = args.db_name or DB_NAME
+    db_uri_full = f"{DB_PREFIX}{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
 
-    DB_URI = f"{DB_PREFIX}{DB_USERNAME}:{DB_PASSWORD}@{DB_URI}:{DB_PORT}/{DB_NAME}"
-    print("DB_URI:", DB_URI)
-
-    log(f"Using DB URI: {_redact_url(DB_URI)}", logging.INFO)
-    g_schema = args.schema or DEFAULT_SCHEMA  # if empty string passed, fallback
-
-    log(f"Using measurement_id: {guid}", logging.INFO)
-    log(f"Schema: {g_schema}", logging.INFO)
+    log(f"Using DB URI: {_redact_url(db_uri_full)}", logging.INFO)
+    log(f"Schema: {args.schema}", logging.INFO)
     log(f"Processing file: {json_file}", logging.INFO)
-    log(f"Effective measurement_id (JSON preferred): {guid}", logging.INFO)
+    log(f"CLI --guid override: {force_guid or 'Not provided'}", logging.INFO)
 
-    process_file(
-        json_file=json_file,
-        guid=guid,
-        db_uri=DB_URI,
-        dry_run=args.dry_run,
-        no_db_check=args.no_db_check,
-        schema=g_schema,
-        force_guid=guid,
-        gui=args.gui,
-    )
-
-    log("✅ All measurement records inserted successfully.", logging.INFO)
+    try:
+        process_file(
+            json_file=json_file,
+            db_uri=db_uri_full,
+            dry_run=args.dry_run,
+            no_db_check=args.no_db_check,
+            schema=args.schema,
+            force_guid=force_guid,
+        )
+        if not args.dry_run:
+            log("✅ All measurement records inserted successfully.", logging.INFO)
+    except SystemExit as e:
+        log(f"Process halted with exit code {e.code}.", logging.WARNING if e.code == 0 else logging.ERROR)
+    except Exception as e:
+        log(f"An unhandled error occurred in process_file: {e}", logging.CRITICAL)
+        logger.exception("Unhandled error in main process")
 
 
 if __name__ == "__main__":
