@@ -1,13 +1,18 @@
 {
-  "path": "/Users/aps/Documents/GitHub/colorDataToJson/Data",
-  "json_file": "printer.cie.json",
-  "measurement_id": "",
-  "db_uri": "",
-  "schema": "color_data",
+  "path": "/Users/aps/Docs/colordataJsonToPostgres/Output",
+  "json_file": "/Users/aps/Docs/colordataJsonToPostgres/Output/IdeallianceATLP2X202505.json",
+  "guid": "",
+  "db_uri": "127.0.0.1",
+  "db_port": "5432",
+  "db_name": "postgres",
+  "username": "pgadmin",
+  "password": "postgres",
+  "schema": "color_measurement",
   "log_level": "INFO",
   "log_file": "Logs/test.log",
   "debug": false,
   "verbose": false,
   "dry_run": false,
-  "no_db_check": false
+  "no_db_check": false,
+  "window_geometry": "900x558+130+422"
 }
