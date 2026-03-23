@@ -5,6 +5,7 @@
  Version: 1.1.8.5
  Date: 2026-03-22
  Changes:
+   - Fiexed GUI not launching on some Linux distros due to missing Tkinter modules; added robust import handling and fallback.
    - Fixed `AttributeError: module 'uuid' has no attribute 'uuid7'` for Python < 3.11 by adding a fallback to the `uuid6` library. Requires `pip install uuid6`.
    - Corrected UUID handling: Uses standard `uuid` library. `uuid.UUID()` is used for parsing any existing UUID version from JSON/CLI, and `uuid.uuid7()` is used for generating new UUIDs. Removed `uuid6` dependency.
    - Added status area to GUI to show which file is being processed.

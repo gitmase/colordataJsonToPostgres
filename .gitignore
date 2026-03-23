@@ -1,6 +1,8 @@
 # Local Folders
 Old/
 Logs/
+Data/
+Output
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
