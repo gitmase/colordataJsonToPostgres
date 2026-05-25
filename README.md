@@ -13,7 +13,7 @@ python3 loadJson.py  --path "/Users/aps/Documents/GitHub/colorDataToJson/Data" -
  python3 loadJson.py  --path "/Users/aps/Documents/GitHub/jsonToPostgres/Data" --json_file "printer.cie.json" --db "postgresql+psycopg2://pgadmin:postgres@10.211.55.9:5432/postgres"  --schema "color_measurement"  --verbose     
 
 =======
->>>>>>> d945e46611a0675d18cd2dae834ac7b20409f861
+
 
 ## Logs
 
